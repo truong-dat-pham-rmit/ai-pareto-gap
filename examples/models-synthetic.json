@@ -1,0 +1,10 @@
+[
+  {"slug":"us-example-a","name":"Synthetic US A","country":"us","release_date":"2026-03-01","intelligence":40,"cost_per_task":0.1,"estimated":false},
+  {"slug":"cn-example-a","name":"Synthetic China A","country":"cn","release_date":"2026-03-01","intelligence":38,"cost_per_task":0.08,"estimated":false},
+  {"slug":"cn-example-b","name":"Synthetic China B","country":"cn","release_date":"2026-04-01","intelligence":46,"cost_per_task":5,"estimated":false},
+  {"slug":"cn-example-c","name":"Synthetic China C","country":"cn","release_date":"2026-06-01","intelligence":44,"cost_per_task":1,"estimated":false},
+  {"slug":"us-example-b","name":"Synthetic US B","country":"us","release_date":"2026-07-01","intelligence":48,"cost_per_task":10,"estimated":false},
+  {"slug":"us-example-middle","name":"Synthetic US middle point","country":"us","release_date":"2026-08-01","intelligence":41,"cost_per_task":1,"estimated":false},
+  {"slug":"cn-example-d","name":"Synthetic China D","country":"cn","release_date":"2026-09-01","intelligence":47,"cost_per_task":5,"estimated":false},
+  {"slug":"us-example-c","name":"Synthetic US C","country":"us","release_date":"2026-09-22","intelligence":52,"cost_per_task":8,"estimated":false}
+]

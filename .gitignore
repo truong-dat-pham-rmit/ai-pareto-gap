@@ -1,0 +1,26 @@
+# Publish the project files deliberately; research downloads stay local.
+/*
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/LICENSE
+!/NOTICE.md
+!/CONTRIBUTING.md
+!/requirements-plot.txt
+!/scripts/
+!/docs/
+!/examples/
+!/reports/
+!/.github/
+!/outputs/
+/outputs/*
+!/outputs/slope-gap-march-october-2026.png
+!/outputs/slope-gap-march-october-2026.svg
+
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+*.log
+.DS_Store

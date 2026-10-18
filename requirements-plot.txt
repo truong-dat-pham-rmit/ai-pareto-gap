@@ -1,0 +1,2 @@
+# Optional. Analysis and tests use only Python's standard library.
+matplotlib>=3.9,<4
