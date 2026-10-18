@@ -1,5 +1,13 @@
 # Methodology
 
+The equations below apply to both the frozen research example and newer
+maintainer-published snapshots. The ordinary reader downloads country-level
+aggregates without an AA account; the local tool recomputes their signed gaps
+and monthly brackets. Release-event dates are publisher-calculated summaries.
+The original October example uses explicitly non-estimated scores. New API
+snapshots use the **API-published** policy because the API omits estimate flags.
+See [the data guide](data.md) for these source and eligibility differences.
+
 ## Purpose and measurement basis
 
 This project compares the capability available across a declared range of inference budgets. It combines two familiar descriptions of public AI models: their measured benchmark capability and the average cost of running the benchmark workload. It reports both a signed area difference and an equivalent historical release-cohort bracket.

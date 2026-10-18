@@ -8,7 +8,7 @@ from analyze_slopes import analyze_slopes, interpolated_score, slope_area_score,
 
 def model(name, cost, intelligence, **extra):
     return {"slug": name, "name": name, "cost_per_task": cost,
-            "intelligence": intelligence, "country": "us", "release_date": "2026-03-01", **extra}
+            "intelligence": intelligence, "country": "us", "release_date": "2026-03-01", "estimated": False, **extra}
 
 
 def frontier(*rows):

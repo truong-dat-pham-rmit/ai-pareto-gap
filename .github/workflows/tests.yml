@@ -10,14 +10,17 @@ permissions:
 
 jobs:
   math-and-example:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: ['3.11', '3.13']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m unittest discover -s scripts -p "test_analyze*.py"
+      - run: python -m unittest discover -s scripts -p "test_*.py"
       - run: python scripts/run_example.py
+      - run: python run.py --demo --no-open
+      - run: python run.py --offline --no-open

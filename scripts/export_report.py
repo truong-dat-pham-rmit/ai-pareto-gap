@@ -14,6 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def export_aggregates(slopes, baseline):
     """Use explicit allowlists so source observations cannot leak into reports."""
+    policies = baseline.get("settings", {}).get("score_policies", ["measured"])
+    primary_policy = "measured" if "measured" in policies else policies[0]
     return {
         "metadata": {
             "title": "Pareto Gap: frozen release-cohort comparison",
@@ -22,7 +24,7 @@ def export_aggregates(slopes, baseline):
             "source": "Artificial Analysis",
             "source_url": "https://artificialanalysis.ai/models/",
             "source_methodology_url": "https://artificialanalysis.ai/methodology/intelligence-benchmarking",
-            "source_input_sha256": slopes["metadata"]["input_sha256"],
+            "source_input_sha256": slopes["metadata"].get("input_sha256"),
             "content": "Derived country-level aggregates; source model observations omitted",
             "analysis_type": slopes["metadata"]["analysis_type"],
             "area_units": slopes["metadata"]["area_units"],
@@ -33,8 +35,9 @@ def export_aggregates(slopes, baseline):
             "data_notice": "Source observations are not redistributed or relicensed; see NOTICE.md",
             "coverage": {country: {
                 "total_configurations": baseline["snapshot_country_counts"][country]["total_records"],
-                "measured_scored_configurations": baseline["snapshot_country_counts"][country]["by_policy"]["measured"]["scored_models"],
-                "measured_costed_configurations": baseline["snapshot_country_counts"][country]["by_policy"]["measured"]["scored_and_costed_models"],
+                "scored_configurations": baseline["snapshot_country_counts"][country]["by_policy"][primary_policy]["scored_models"],
+                "costed_configurations": baseline["snapshot_country_counts"][country]["by_policy"][primary_policy]["scored_and_costed_models"],
+                "score_policy": primary_policy,
             } for country in ("us", "cn")},
         },
         "scenarios": [{

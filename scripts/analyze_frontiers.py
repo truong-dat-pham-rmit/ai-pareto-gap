@@ -22,7 +22,20 @@ FLOORS = (0.0, 20.0, 30.0, 40.0)
 BUDGETS = ((0.01, 10.0), (0.01, 1.0), (0.1, 10.0))
 COUNTRIES = ("us", "cn")
 POLICIES = ("measured", "including_estimated")
+VALID_POLICIES = (*POLICIES, "api_published")
 TOLERANCE = 1e-9
+
+
+def validate_policies(policies):
+    """Require named, distinct policies rather than silently inventing a filter."""
+    if isinstance(policies, str):
+        raise ValueError("Policies must be a sequence of policy names")
+    policies = tuple(policies)
+    if not policies or len(set(policies)) != len(policies):
+        raise ValueError("Supply at least one distinct score policy")
+    if any(policy not in VALID_POLICIES for policy in policies):
+        raise ValueError(f"Score policies must be chosen from {VALID_POLICIES}")
+    return policies
 
 
 def finite_number(value):
@@ -46,6 +59,7 @@ def parse_date(value):
 
 def month_index(month):
     year, number = map(int, month.split("-"))
+    date(year, number, 1)  # Reject invalid month labels instead of rolling them forward.
     return year * 12 + number - 1
 
 
@@ -71,13 +85,16 @@ def normalize_records(records):
         record["_release"] = parse_date(record.get("release_date"))
         record["_score"] = finite_number(record.get("intelligence"))
         record["_cost"] = finite_number(record.get("cost_per_task"))
-        record["estimated"] = record.get("estimated") is True
+        estimate = record.get("estimated")
+        record["estimated"] = estimate if isinstance(estimate, bool) else None
         record["deprecated"] = record.get("deprecated") is True
         normalized.append(record)
     return normalized
 
 
 def eligible_score_models(records, country, cutoff, policy="measured"):
+    if policy not in VALID_POLICIES:
+        raise ValueError(f"Unknown score policy: {policy}")
     if isinstance(cutoff, str):
         cutoff = date.fromisoformat(cutoff)
     return [
@@ -85,7 +102,7 @@ def eligible_score_models(records, country, cutoff, policy="measured"):
         if model["country"] == country
         and model["_release"] is not None and model["_release"] <= cutoff
         and model["_score"] is not None
-        and (policy == "including_estimated" or not model["estimated"])
+        and (policy != "measured" or model["estimated"] is False)
     ]
 
 
@@ -202,7 +219,8 @@ def country_area_summary(score_models, frontier, budget_min, budget_max, floor):
         "eligible_scored_model_count": len(score_models),
         "eligible_costed_model_count": len(cost_models),
         "deprecated_costed_model_count": sum(model["deprecated"] for model in cost_models),
-        "estimated_costed_model_count": sum(model["estimated"] for model in cost_models),
+        "estimated_costed_model_count": sum(model["estimated"] is True for model in cost_models),
+        "unknown_estimate_status_costed_model_count": sum(model["estimated"] is None for model in cost_models),
         "frontier_model_count": len(frontier),
     }
     if not score_models:
@@ -341,7 +359,7 @@ def release_event_lag(target_date, target_value, events, tolerance=TOLERANCE):
     }
 
 
-def audit_records(records, snapshot):
+def audit_records(records, snapshot, policies=POLICIES):
     country_counts = {}
     missingness = {}
     exclusions = []
@@ -360,8 +378,10 @@ def audit_records(records, snapshot):
                 reasons.append("missing_or_nonfinite_task_cost")
             elif model["_cost"] <= 0:
                 reasons.append("nonpositive_task_cost")
-            if model["estimated"]:
-                reasons.append("estimated_score_excluded_from_primary")
+            if model["estimated"] is True:
+                reasons.append("estimated_score_excluded_from_measured")
+            elif model["estimated"] is None:
+                reasons.append("unknown_estimate_status_excluded_from_measured")
             issues.update(reasons)
             if reasons:
                 exclusions.append({"slug": model["slug"], "name": model["name"], "country": country, "reasons": reasons})
@@ -369,29 +389,32 @@ def audit_records(records, snapshot):
             "total_records": len(members),
             "released_by_snapshot": sum(model["_release"] is not None and model["_release"] <= snapshot for model in members),
             "deprecated_records": sum(model["deprecated"] for model in members),
-            "estimated_records": sum(model["estimated"] for model in members),
+            "estimated_records": sum(model["estimated"] is True for model in members),
+            "unknown_estimate_status_records": sum(model["estimated"] is None for model in members),
             "by_policy": {
                 policy: {
                     "scored_models": len(eligible_score_models(records, country, snapshot, policy)),
                     "scored_and_costed_models": len(eligible_cost_models(eligible_score_models(records, country, snapshot, policy))),
-                } for policy in POLICIES
+                } for policy in policies
             },
         }
         missingness[country] = dict(issues)
     return country_counts, missingness, exclusions
 
 
-def analyze(records, snapshot=SNAPSHOT, first_month=FIRST_MONTH):
+def analyze(records, snapshot=SNAPSHOT, first_month=FIRST_MONTH,
+            index_version="4.3.2", policies=POLICIES):
+    policies = validate_policies(policies)
     records = normalize_records(records)
     cutoffs = list(month_cutoffs(first_month, snapshot))
     if not cutoffs:
         raise ValueError("The first month must not be after the snapshot")
-    counts, missingness, exclusions = audit_records(records, snapshot)
+    counts, missingness, exclusions = audit_records(records, snapshot, policies)
     result = {
         "metadata": {
             "snapshot_date": snapshot.isoformat(),
             "first_month": first_month,
-            "intelligence_index_version": "4.3.2",
+            "intelligence_index_version": index_version,
             "analysis_type": "release_cohorts_at_fixed_snapshot_scores_and_prices",
             "area_units": "average_above_floor_intelligence_index_points",
             "gap_sign": "positive means US advantage; negative means China advantage",
@@ -400,9 +423,9 @@ def analyze(records, snapshot=SNAPSHOT, first_month=FIRST_MONTH):
                 "Current scores and task costs are applied retrospectively to release cohorts; these are not historical transaction prices.",
                 "Catalog omissions, missing scores/prices/dates, and survivorship limit historical coverage.",
                 "Deprecated entries are retained to reconstruct released-model cohorts, without asserting historical or current purchasability.",
-                "Estimated scores are excluded from the primary policy and included only in sensitivity results.",
+                "The measured policy requires an explicit false estimate flag. API-published and estimated-inclusive policies admit published scores without claiming measured-only status.",
                 "Missing and nonpositive task costs are excluded from areas; peak capability does not require cost data.",
-                "October 2026 is partial as of 7 October; monthly lags use calendar labels, not precise elapsed months.",
+                f"The final cohort ends on {snapshot.isoformat()}; monthly lags use calendar labels, not precise elapsed months.",
                 "Area equivalence is scalar equivalence and does not establish full Pareto dominance.",
                 "Equal weight per log-budget interval and per above-floor index point is a chosen convention, not measured user demand.",
                 "Origin is the normalized developer country and does not identify the hosting jurisdiction.",
@@ -412,8 +435,8 @@ def analyze(records, snapshot=SNAPSHOT, first_month=FIRST_MONTH):
         "settings": {
             "floors": list(FLOORS),
             "budgets": [{"minimum": low, "maximum": high, "primary": index == 0} for index, (low, high) in enumerate(BUDGETS)],
-            "score_policies": list(POLICIES),
-            "primary_score_policy": "measured",
+            "score_policies": list(policies),
+            "primary_score_policy": "measured" if "measured" in policies else policies[0],
             "lag_numerical_tolerance": TOLERANCE,
             "country_codes": {"us": "United States", "cn": "China"},
             "frontier_endpoint_convention": "affordable when price <= budget; integrals ignore isolated endpoints",
@@ -438,7 +461,7 @@ def analyze(records, snapshot=SNAPSHOT, first_month=FIRST_MONTH):
             "missing_or_nonpositive_cost_models": [model_view(model) for model in missing_cost],
             "highest_missing_or_nonpositive_cost_score": missing_cost[0]["_score"] if missing_cost else None,
         }
-    for policy in POLICIES:
+    for policy in policies:
         cohorts = []
         us_peak_history = []
         result["peak_series"][policy] = []
@@ -518,11 +541,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, default=Path("data/models-2026-10-07.json"))
     parser.add_argument("--output", type=Path, default=Path("analysis/results.json"))
+    parser.add_argument("--snapshot", type=date.fromisoformat, default=SNAPSHOT,
+                        help="Snapshot cutoff date, YYYY-MM-DD")
+    parser.add_argument("--first-month", default=FIRST_MONTH, help="First release cohort, YYYY-MM")
+    parser.add_argument("--index-version", default="4.3.2", help="Compatible Intelligence Index version")
+    parser.add_argument("--policies", nargs="+", choices=VALID_POLICIES, default=POLICIES)
     args = parser.parse_args()
     records = json.loads(args.input.read_text(encoding="utf-8-sig"))
     if not isinstance(records, list):
         raise ValueError("Input must be a JSON list of normalized model records")
-    result = analyze(records)
+    result = analyze(records, snapshot=args.snapshot, first_month=args.first_month,
+                     index_version=args.index_version, policies=args.policies)
     result["metadata"]["input_file"] = str(args.input)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")

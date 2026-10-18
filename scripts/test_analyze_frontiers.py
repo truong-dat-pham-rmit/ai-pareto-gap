@@ -11,7 +11,7 @@ from analyze_frontiers import (
 
 def model(slug, score, cost, country="us", release="2025-01-01", **extra):
     return {"slug": slug, "name": slug, "country": country, "intelligence": score,
-            "cost_per_task": cost, "release_date": release, **extra}
+            "cost_per_task": cost, "release_date": release, "estimated": False, **extra}
 
 
 def frontier(*models):

@@ -16,9 +16,9 @@ class PublicationTests(unittest.TestCase):
     def test_export_does_not_copy_source_records_or_local_metadata(self):
         models = [
             {"slug": "PRIVATE_SOURCE_MARKER", "name": "PRIVATE_SOURCE_MARKER", "country": "us",
-             "release_date": "2026-03-01", "intelligence": 40, "cost_per_task": .1},
+             "release_date": "2026-03-01", "intelligence": 40, "cost_per_task": .1, "estimated": False},
             {"slug": "cn", "country": "cn", "release_date": "2026-03-01",
-             "intelligence": 38, "cost_per_task": .1},
+             "intelligence": 38, "cost_per_task": .1, "estimated": False},
         ]
         baseline, slopes = analyze(models), analyze_slopes(models)
         slopes["metadata"].update(input_sha256="test-hash", input_file="PRIVATE_SOURCE_MARKER")
